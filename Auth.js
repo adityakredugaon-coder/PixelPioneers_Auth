@@ -4,9 +4,7 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./AuthDb');
-
 const app = express();
-
 app.use(express.json());
 app.use(cors());
 
@@ -74,7 +72,7 @@ app.get('/users', (req, res) => {``
     if (err) return res.send(err);
 
     res.status(200).json({
-      message: "Users Get Success",
+      message: "Users Get Successfully",
       data: results
     })
   })
