@@ -3,41 +3,52 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const db = require('./AuthDb');
+
 const app = express();
 app.use(express.json());
 app.use(cors());
 
-///////////// Register User /////////////////////////////
-
+//////////////// REGISTER ////////////////////
 app.post('/register', async (req, res) => {
   const { name, email, phone, password } = req.body;
 
   const checkSql = "SELECT * FROM users WHERE email = ?";
   db.query(checkSql, [email], async (err, result) => {
+    if (err) return res.status(500).send(err);
 
     if (result.length > 0) {
-      return res.send("Email already exists");
+      return res.status(400).send("Email already exists");
     }
 
+    try {
+      // 🔐 Password hash
+      const hashedPassword = await bcrypt.hash(password, 10);
 
-    const insertSql = "INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)";
+      const insertSql =
+        "INSERT INTO users (name, email, phone, password) VALUES (?, ?, ?, ?)";
 
-    db.query(insertSql, [name, email, phone, password], (err, result) => {
-      if (err) return res.send(err);
+      db.query(
+        insertSql,
+        [name, email, phone, hashedPassword],
+        (err, result) => {
+          if (err) return res.status(500).send(err);
 
-      res.send("User Registered Successfully");
-    });
+          res.send("User Registered Successfully");
+        }
+      );
+    } catch (error) {
+      res.status(500).send(error);
+    }
   });
 });
 
-
-/////// Login User /////////////////////
-
+//////////////// LOGIN ////////////////////
 app.post('/login', (req, res) => {
   const { email, password } = req.body;
 
   const sql = "SELECT * FROM users WHERE email = ?";
   db.query(sql, [email], async (err, results) => {
+    if (err) return res.status(500).send(err);
 
     if (results.length === 0) {
       return res.send("User not found");
@@ -45,38 +56,44 @@ app.post('/login', (req, res) => {
 
     const user = results[0];
 
-    const match = await bcrypt.compare(password, user.password);
+    try {
+      const match = await bcrypt.compare(password, user.password);
 
-    if (!match) {
-      return res.send("Wrong Password");
+      if (!match) {
+        return res.send("Wrong Password");
+      }
+
+      const token = jwt.sign({ id: user.id }, "secretkey", {
+        expiresIn: "1h",
+      });
+
+      res.send({
+        message: "Login Successful",
+        token: token,
+      });
+    } catch (error) {
+      res.status(500).send(error);
     }
+  });
+});
 
-    const token = jwt.sign({ id: user.id }, "secretkey", {
-      expiresIn: "1h"
-    });
+//////////////// GET USERS ////////////////////
+app.get('/users', (req, res) => {
+  const sql = "SELECT * FROM users";
 
-    res.send({
-      message: "Login Successful",
-      token: token
+  db.query(sql, (err, results) => {
+    if (err) return res.status(500).send(err);
+
+    res.json({
+      message: "Users Get Successfully",
+      data: results,
     });
   });
 });
 
-/////// get All Users ////////////
+//////////////// SERVER ////////////////////
+const PORT = 3000;
 
-app.get('/users', (req, res) => {``
-  const sql = "SELECT * FROM users"
-
-  db.query(sql, (err, results) => {
-    if (err) return res.send(err);
-
-    res.status(200).json({
-      message: "Users Get Successfully",
-      data: results
-    })
-  })
-})
-
-app.listen(3000, () => {
-  console.log("Server running on port 3000");
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
